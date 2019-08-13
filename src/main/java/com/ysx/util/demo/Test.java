@@ -3,6 +3,7 @@ package com.ysx.util.demo;
 import com.ysx.util.ObjectMappingMapUtil;
 import com.ysx.util.demo.enums.Sex;
 
+import java.util.Date;
 import java.util.Map;
 import java.util.Set;
 
@@ -38,6 +39,7 @@ public class Test {
         School school = new School();
         school.setSchoolName("北大");
         school.setAddress(address);
+        school.setCreateDate(new Date());
 
         Student student = new Student();
         student.setName("张三");

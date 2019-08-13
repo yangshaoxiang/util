@@ -1,7 +1,10 @@
 package com.ysx.util.demo;
 
 import com.ysx.util.annotation.CatchSingleProperty;
+import com.ysx.util.annotation.DateMapping;
 import com.ysx.util.annotation.IgnoreMapMapping;
+
+import java.util.Date;
 
 public class School {
 
@@ -12,6 +15,17 @@ public class School {
 
     @IgnoreMapMapping
     private Integer schoolNum;
+
+    @DateMapping
+    private Date createDate;
+
+    public Date getCreateDate() {
+        return createDate;
+    }
+
+    public void setCreateDate(Date createDate) {
+        this.createDate = createDate;
+    }
 
     public Integer getSchoolNum() {
         return schoolNum;
@@ -37,11 +51,14 @@ public class School {
         this.address = address;
     }
 
+
     @Override
     public String toString() {
         return "School{" +
                 "schoolName='" + schoolName + '\'' +
                 ", address=" + address +
+                ", schoolNum=" + schoolNum +
+                ", createDate=" + createDate +
                 '}';
     }
 }

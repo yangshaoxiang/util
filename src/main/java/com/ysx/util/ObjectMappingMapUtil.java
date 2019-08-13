@@ -1,12 +1,11 @@
 package com.ysx.util;
 
-import com.ysx.util.annotation.CatchAllProperty;
-import com.ysx.util.annotation.CatchSingleProperty;
-import com.ysx.util.annotation.IgnoreMapMapping;
-import com.ysx.util.annotation.MapKeyMapping;
+import com.ysx.util.annotation.*;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -137,9 +136,29 @@ public class ObjectMappingMapUtil {
                 mapValue = getMapValue(valueField, mapValue);
             }
         }
+        // 检查属性是否是日期类型,是否需要做日期格式化
+        DateMapping dateMappingAnnotation = field.getAnnotation(DateMapping.class);
+        if(dateMappingAnnotation!=null&&mapValue instanceof Date){
+            mapValue = getDateString((Date) mapValue,dateMappingAnnotation.value());
+        }
         return mapValue;
     }
 
+    /**
+     * 将日期转化为字符串表达
+     * @param date 要格式化的日期
+     * @param formate 格式化模板
+     * @return 日期转化后的字符串表达
+     */
+    private static String getDateString(Date date,String formate){
+        try {
+            return  new SimpleDateFormat(formate).format(date);
+        }catch (Exception e){
+           // dateString = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(date);
+            e.printStackTrace();
+        }
+        return null;
+    }
     /**
      * 判断类型是否是不可拆分的几种常见基本类型(不常见的未包含其中)
      * 包含: 基本类型，基本类型包装类型,容器类型(集合，数组)，String,Date类型，
@@ -344,12 +363,47 @@ public class ObjectMappingMapUtil {
                 // 普通属性字段 直接从map中取值 赋值
                 String mapKey = getMapKey(field);
                 Object mapValue = sourceMap.get(mapKey);
-                field.set(t, mapValue);
+                // 转换获取到的value 值类型 (可能会转换)
+                mapValue = valueTypeChange(field,mapValue);
+                //类型一致 赋值
+                if(mapValue!=null&&field.getType() == mapValue.getClass()){
+                    field.set(t, mapValue);
+                }
             }
         } catch (IllegalAccessException | InstantiationException e) {
             e.printStackTrace();
         }
         return t;
+    }
+
+    /**
+     *  可能存在的类型转换 -- 当前仅存在 字符串和日期转化
+     * @param field 类字段
+     * @param mapValue 从map中获取的值
+     * @return 需要类型转化后的值，否则原值返回
+     */
+    private static Object valueTypeChange(Field field, Object mapValue) {
+        //当前只有日期-字符串类型存在转化，其他类型暂时不需转化
+        if(Date.class.isAssignableFrom(field.getType())){
+            DateMapping dateMapping = field.getAnnotation(DateMapping.class);
+           return  stringToDate(String.valueOf(mapValue),dateMapping.value());
+        }
+        return mapValue;
+    }
+
+    /**
+     *  string转date
+     * @param dateString 日期字符串表示
+     * @param formate 日期格式化模板
+     * @return 字符串转化后的日期
+     */
+    private static Date stringToDate(String dateString,String formate){
+        try {
+            return new SimpleDateFormat(formate).parse(dateString);
+        } catch (ParseException e) {
+           e.printStackTrace();
+        }
+        return null;
     }
 
 
