@@ -299,7 +299,7 @@ public class ObjectMappingMapUtil {
         if (fieldList != null) {
             return fieldList;
         }
-        // 加锁 保证同一个要获取字段的类和同一个停止类情况下 只执行一次获取该类所有字段操作 对于不同类可串行执行
+        // 加锁 保证同一个要获取字段的类和同一个停止类情况下 只执行一次获取该类所有字段操作 对于不同类可并行执行
         synchronized (getFieldCatchKey(clazz, stopSuperClass)) {
             //双重检查
             fieldList = objFieldsCatch.get(fieldCatchKey);
