@@ -2,6 +2,7 @@ package com.ysx.util.demo;
 
 import com.ysx.util.ObjectMappingMapUtil;
 import com.ysx.util.demo.enums.Sex;
+import com.ysx.util.handler.impl.ValueEmptyHandler;
 
 import java.util.Date;
 import java.util.Map;
@@ -13,7 +14,10 @@ public class Test {
         Student student = getStudent();
         System.out.println(student);
         Map<String, Object> map = ObjectMappingMapUtil.objectToMap(student, Object.class);
-        objToMapAndPrint(map);
+        mapPrint(map);
+        System.out.println("-----bean->map 新加自定义属性过滤器");
+        Map<String, Object> stringObjectMap = ObjectMappingMapUtil.objectToMap(student, Object.class, new ValueEmptyHandler());
+        mapPrint(stringObjectMap);
 
         System.out.println("---------测试Map-->Bean--------------");
         map.put("shi","合肥市");
@@ -22,7 +26,7 @@ public class Test {
 
         System.out.println("---------测试枚举转化--------------");
         Map<String, Object> enumMap = ObjectMappingMapUtil.objectToMap(Sex.MAN, null);
-        objToMapAndPrint(enumMap);
+        mapPrint(enumMap);
 
         Sex sex = ObjectMappingMapUtil.mapToObject(map, Sex.class, null);
         System.out.println(sex);
@@ -51,7 +55,7 @@ public class Test {
         return student;
     }
 
-    private static void objToMapAndPrint(Map<String, Object> map){
+    private static void mapPrint(Map<String, Object> map){
         Set<Map.Entry<String, Object>> entries = map.entrySet();
         for (Map.Entry<String, Object> entry : entries) {
             System.out.println(entry.getKey()+"---"+entry.getValue());

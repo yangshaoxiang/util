@@ -1,6 +1,7 @@
 package com.ysx.util;
 
 import com.ysx.util.annotation.*;
+import com.ysx.util.handler.MapIgnoreHandler;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -29,6 +30,7 @@ public class ObjectMappingMapUtil {
     }
 
 
+
     /**
      * 对象属性转map
      *
@@ -39,7 +41,23 @@ public class ObjectMappingMapUtil {
     public static Map<String, Object> objectToMap(Object sourceObject, Class<?> stopClass) {
         HashMap<String, Object> resultMap = new HashMap<>();
         //根据对象内容 填充map属性
-        populateMap(resultMap, sourceObject, stopClass);
+        populateMap(resultMap, sourceObject, stopClass,null);
+        return resultMap;
+    }
+
+
+    /**
+     * 对象属性转map
+     *
+     * @param sourceObject 要转化为map的对象
+     * @param stopClass    要停止在对象父类的层级，不传或传递的非父类则默认Object 即只会转化继承结构中Object类以下的属性
+     * @param mapIgnoreHandler 自定义属性忽略策略
+     * @return 转化后的map
+     */
+    public static Map<String, Object> objectToMap(Object sourceObject, Class<?> stopClass, MapIgnoreHandler mapIgnoreHandler) {
+        HashMap<String, Object> resultMap = new HashMap<>();
+        //根据对象内容 填充map属性
+        populateMap(resultMap, sourceObject, stopClass,mapIgnoreHandler);
         return resultMap;
     }
 
@@ -50,7 +68,7 @@ public class ObjectMappingMapUtil {
      * @param sourceObject map填充的"数据源"
      * @param stopClass    限定 sourceObject 取的继承的属性层级
      */
-    private static void populateMap(HashMap<String, Object> resultMap, Object sourceObject, Class<?> stopClass) {
+    private static void populateMap(HashMap<String, Object> resultMap, Object sourceObject, Class<?> stopClass,MapIgnoreHandler mapIgnoreHandler) {
         if (sourceObject == null) {
             return;
         }
@@ -71,12 +89,17 @@ public class ObjectMappingMapUtil {
             if (catchAllAnnotation != null && !isBaseType(field.getType())) {
                 try {
                     // 递归调用 - 将字段对应的对象值填充到map集合中
-                    populateMap(resultMap, field.get(sourceObject), catchAllAnnotation.stopClass());
+                    populateMap(resultMap, field.get(sourceObject), catchAllAnnotation.stopClass(),mapIgnoreHandler);
                 } catch (IllegalAccessException e) {
                     e.printStackTrace();
                 }
             } else {
-                resultMap.put(getMapKey(field), getMapValue(field, sourceObject));
+                String standardKey = getMapKey(field);
+                Object standardValue =  getMapValue(field, sourceObject);
+                // 对用户自定义的忽略策略做处理
+                if(mapIgnoreHandler==null||!mapIgnoreHandler.ignoreHandler(standardKey,standardValue)){
+                    resultMap.put(standardKey,standardValue);
+                }
             }
         }
     }
@@ -154,7 +177,7 @@ public class ObjectMappingMapUtil {
         try {
             return  new SimpleDateFormat(formate).format(date);
         }catch (Exception e){
-           // dateString = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(date);
+            // dateString = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(date);
             e.printStackTrace();
         }
         return null;
@@ -384,9 +407,9 @@ public class ObjectMappingMapUtil {
      */
     private static Object valueTypeChange(Field field, Object mapValue) {
         //当前只有日期-字符串类型存在转化，其他类型暂时不需转化
-        if(Date.class.isAssignableFrom(field.getType())){
+        if(mapValue!=null && Date.class.isAssignableFrom(field.getType())){
             DateMapping dateMapping = field.getAnnotation(DateMapping.class);
-           return  stringToDate(String.valueOf(mapValue),dateMapping.value());
+            return  stringToDate(String.valueOf(mapValue),dateMapping.value());
         }
         return mapValue;
     }
@@ -401,7 +424,7 @@ public class ObjectMappingMapUtil {
         try {
             return new SimpleDateFormat(formate).parse(dateString);
         } catch (ParseException e) {
-           e.printStackTrace();
+            e.printStackTrace();
         }
         return null;
     }
@@ -520,12 +543,11 @@ public class ObjectMappingMapUtil {
             }
             // 判断字段是否匹配
             if (!fieldValueSingleMatch(value, matchMap, field)) {
-               return false;
+                return false;
             }
         }
         return true;
     }
 
 }
-
 

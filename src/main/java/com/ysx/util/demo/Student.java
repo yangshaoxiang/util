@@ -10,6 +10,16 @@ public class Student extends Person{
     @CatchAllProperty
     private School school;
 
+    private String eduNum;
+
+    public String getEduNum() {
+        return eduNum;
+    }
+
+    public void setEduNum(String eduNum) {
+        this.eduNum = eduNum;
+    }
+
     public Integer getStuNo() {
         return stuNo;
     }
