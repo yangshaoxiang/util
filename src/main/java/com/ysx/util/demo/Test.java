@@ -31,7 +31,6 @@ public class Test {
         Sex sex = ObjectMappingMapUtil.mapToObject(map, Sex.class, null);
         System.out.println(sex);
 
-
     }
 
     private static Student getStudent(){
@@ -41,7 +40,7 @@ public class Test {
         address.setXian("肥东县");
 
         School school = new School();
-        school.setSchoolName("北大");
+        school.setSchoolName("第二中学");
         school.setAddress(address);
         school.setCreateDate(new Date());
 

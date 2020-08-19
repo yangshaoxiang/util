@@ -1,7 +1,11 @@
 package com.ysx.util;
 
+
+
+import com.ysx.util.annotation.IgnoreMapMapping;
 import com.ysx.util.annotation.*;
 import com.ysx.util.handler.MapIgnoreHandler;
+
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -11,7 +15,9 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 
+
 /**
+ * 对象和map集合 互转工具
  * 对象转map 对象中请勿出现同名属性 因为map 键唯一 有同名属性请用 MapKeyMapping 做别名映射标记
  * ysx
  */
@@ -20,16 +26,25 @@ public class ObjectMappingMapUtil {
     /**
      * 缓存要转化为Map属性的类的字段信息
      */
-    private static final Map<String, List<Field>> objFieldsCatch = new ConcurrentHashMap<>();
+    private static final Map<String, List<Field>> OBJ_FILDS_CACHE = new ConcurrentHashMap<>();
     /**
      * 字段缓存map key前缀 防止其他项目或jar使用相同字符串作为锁发生互斥
      */
-    private static final String keyPrefix = "objectToMap-";
+    private static final String KEY_PREFIX = "objectToMap-";
 
     private ObjectMappingMapUtil() {
     }
 
 
+    /**
+     * 对象属性转map
+     *
+     * @param sourceObject 要转化为map的对象
+     * @return 转化后的map
+     */
+    public static Map<String, Object> objectToMap(Object sourceObject) {
+        return  objectToMap(sourceObject,Object.class);
+    }
 
     /**
      * 对象属性转map
@@ -39,7 +54,7 @@ public class ObjectMappingMapUtil {
      * @return 转化后的map
      */
     public static Map<String, Object> objectToMap(Object sourceObject, Class<?> stopClass) {
-        HashMap<String, Object> resultMap = new HashMap<>();
+        HashMap<String, Object> resultMap = new HashMap<>(16);
         //根据对象内容 填充map属性
         populateMap(resultMap, sourceObject, stopClass,null);
         return resultMap;
@@ -55,7 +70,7 @@ public class ObjectMappingMapUtil {
      * @return 转化后的map
      */
     public static Map<String, Object> objectToMap(Object sourceObject, Class<?> stopClass, MapIgnoreHandler mapIgnoreHandler) {
-        HashMap<String, Object> resultMap = new HashMap<>();
+        HashMap<String, Object> resultMap = new HashMap<>(16);
         //根据对象内容 填充map属性
         populateMap(resultMap, sourceObject, stopClass,mapIgnoreHandler);
         return resultMap;
@@ -177,7 +192,6 @@ public class ObjectMappingMapUtil {
         try {
             return  new SimpleDateFormat(formate).format(date);
         }catch (Exception e){
-            // dateString = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(date);
             e.printStackTrace();
         }
         return null;
@@ -295,14 +309,14 @@ public class ObjectMappingMapUtil {
         }
         //到缓存中查找对应的字段信息
         String fieldCatchKey = getFieldCatchKey(clazz, stopSuperClass);
-        List<Field> fieldList = objFieldsCatch.get(fieldCatchKey);
+        List<Field> fieldList = OBJ_FILDS_CACHE.get(fieldCatchKey);
         if (fieldList != null) {
             return fieldList;
         }
-        // 加锁 保证同一个要获取字段的类和同一个停止类情况下 只执行一次获取该类所有字段操作 对于不同类可并行执行
+        // 加锁 保证同一个要获取字段的类和同一个停止类情况下 只执行一次获取该类所有字段操作 对于不同类可串行执行
         synchronized (getFieldCatchKey(clazz, stopSuperClass)) {
             //双重检查
-            fieldList = objFieldsCatch.get(fieldCatchKey);
+            fieldList = OBJ_FILDS_CACHE.get(fieldCatchKey);
             if (fieldList != null) {
                 return fieldList;
             }
@@ -312,7 +326,7 @@ public class ObjectMappingMapUtil {
                 //得到父类,然后赋给自己
                 tmpClazz = tmpClazz.getSuperclass();
             }
-            objFieldsCatch.put(fieldCatchKey, fieldList);
+            OBJ_FILDS_CACHE.put(fieldCatchKey, fieldList);
         }
         return fieldList;
     }
@@ -325,7 +339,7 @@ public class ObjectMappingMapUtil {
      * @return 返回存入到字符串常量池中key的引用
      */
     private static String getFieldCatchKey(Class objClass, Class stopClass) {
-        return (keyPrefix + objClass.getName() + "-" + stopClass.getName()).intern();
+        return (KEY_PREFIX + objClass.getName() + "-" + stopClass.getName()).intern();
     }
 
     //-----------------------------------------------反向解析-----------------------------------
@@ -353,6 +367,13 @@ public class ObjectMappingMapUtil {
             stopClass = getDefaultStopClass(targetClazz);
         }
 
+        // 对 map key 做 驼峰 _,大小写，等通用比较处理 即将 map key 去除下划线，全部转为小写
+        Set<String> keySet = sourceMap.keySet();
+        HashMap<String, String> keyProcessMap = new HashMap<>();
+        for (String key : keySet) {
+            keyProcessMap.put(commonProcess(key),key);
+        }
+
         // 普通类型直接反射创建对象
         T t = null;
         List<Field> allDeclaredField = getAllDeclaredField(targetClazz, stopClass);
@@ -367,7 +388,8 @@ public class ObjectMappingMapUtil {
                 //加了 属性抓取注解的 需构造新的对象
                 CatchSingleProperty catchSingleAnnotation = field.getAnnotation(CatchSingleProperty.class);
                 CatchAllProperty catchAllAnnotation = field.getAnnotation(CatchAllProperty.class);
-                if ((catchAllAnnotation != null || catchSingleAnnotation != null) && !isBaseType(field.getType())) {
+                boolean needParseField = (catchAllAnnotation != null || catchSingleAnnotation != null) && !isBaseType(field.getType());
+                if (needParseField) {
                     Class<?> fieldType = field.getType();
                     if (fieldType.isEnum()) {
                         Enum matchEnumByProperty = matchEnumByProperty(sourceMap, field);
@@ -382,11 +404,14 @@ public class ObjectMappingMapUtil {
                     field.set(t, catchAllValue);
                     continue;
                 }
-
                 // 普通属性字段 直接从map中取值 赋值
                 String mapKey = getMapKey(field);
                 Object mapValue = sourceMap.get(mapKey);
-                // 转换获取到的value 值类型 (可能会转换)
+                // 如果没有取到值 默认兼容 驼峰，_,,大小写取值
+                if(mapValue == null){
+                    mapValue = sourceMap.get(keyProcessMap.get(commonProcess(mapKey)));
+                }
+                // 转换获取到的 value 值类型 (可能会转换)
                 mapValue = valueTypeChange(field,mapValue);
                 //类型一致 赋值
                 if(mapValue!=null&&field.getType() == mapValue.getClass()){
@@ -400,14 +425,34 @@ public class ObjectMappingMapUtil {
     }
 
     /**
+     *  去除字符串的 _,全部转为小写
+     * @param str 要去除 _ 的字符串
+     * @return 处理后的字符串
+     */
+    private static String commonProcess(String str){
+        return str == null ?null:str.replaceAll("_","").toLowerCase();
+    }
+
+
+
+
+    /**
      *  可能存在的类型转换 -- 当前仅存在 字符串和日期转化
      * @param field 类字段
      * @param mapValue 从map中获取的值
      * @return 需要类型转化后的值，否则原值返回
      */
     private static Object valueTypeChange(Field field, Object mapValue) {
+        if(mapValue == null){
+            return null;
+        }
+        // mapValue 是 Date的子类，转为 Date
+        if(Date.class.isAssignableFrom(mapValue.getClass())&&mapValue.getClass()!=Date.class){
+            Date date = (Date)mapValue;
+            return new Date(date.getTime());
+        }
         //当前只有日期-字符串类型存在转化，其他类型暂时不需转化
-        if(mapValue!=null && Date.class.isAssignableFrom(field.getType())){
+        if(String.class.isAssignableFrom(mapValue.getClass())&& Date.class.isAssignableFrom(field.getType())){
             DateMapping dateMapping = field.getAnnotation(DateMapping.class);
             return  stringToDate(String.valueOf(mapValue),dateMapping.value());
         }
@@ -550,4 +595,6 @@ public class ObjectMappingMapUtil {
     }
 
 }
+
+
 
